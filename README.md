@@ -148,6 +148,37 @@ The response is:
 
 The displayed vector is abbreviated. Batch size and total input characters are bounded by validated configuration. The service currently reports model dimension `384` and normalized output for `intfloat/multilingual-e5-small`.
 
+### `curl` examples
+
+Vectorize a user question by sending it as a `query` input:
+
+```bash
+curl -X POST http://localhost:8081/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_type": "query",
+    "texts": [
+      "What are the contract termination conditions?"
+    ]
+  }'
+```
+
+Vectorize one or more document chunks by using `document` input:
+
+```bash
+curl -X POST http://localhost:8081/v1/embeddings \
+  -H "Content-Type: application/json" \
+  -d '{
+    "input_type": "document",
+    "texts": [
+      "The agreement may be terminated with thirty days written notice.",
+      "Termination does not affect obligations that accrued before the termination date."
+    ]
+  }'
+```
+
+The response contains one normalized vector per input string in `embeddings`. The service applies the model's `query:` or `passage:` prefix internally; callers must not add those prefixes.
+
 ## Planned architecture
 
 Application code will live under `app/` so it is placed at `/app/app` in the container. The initial layout will follow the project-wide Clean Architecture conventions:
