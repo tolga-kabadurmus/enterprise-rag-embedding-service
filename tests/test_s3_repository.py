@@ -5,7 +5,7 @@ import tempfile
 import unittest
 
 from app.common.settings.s3 import S3Settings
-from app.repository.s3.boto3_repository import Boto3S3Repository
+from app.repository.s3.boto3_repository import S3Repository as Boto3S3Repository
 
 
 class FakePaginator:

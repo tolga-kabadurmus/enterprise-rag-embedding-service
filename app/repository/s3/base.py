@@ -7,7 +7,7 @@ from app.repository.base import Repository
 from app.repository.models import S3ObjectMetadata
 
 
-class S3Repository(Repository):
+class StorageRepositoryBase(Repository):
     """Async operations required to synchronize model artifacts."""
 
     @abstractmethod

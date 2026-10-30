@@ -8,13 +8,15 @@ from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
 from app.api.models import EmbeddingRequest, EmbeddingResponse
-from app.common.settings import ApiSettings, ModelSettings, S3Settings
+from app.common.settings import ApiSettings, ModelSettings, S3Settings, StorageProvider
 from app.common.utility.logging import configure_logging
 from app.middleware.exceptions import UnhandledExceptionMiddleware
 from app.repository.embedding.base import EmbeddingRuntime
 from app.repository.embedding.onnx_runtime import OnnxEmbeddingRuntime
 from app.repository.embedding.scaffold import ScaffoldEmbeddingRuntime
-from app.repository.factory import RepositoryFactory
+from app.repository.s3.base import StorageRepositoryBase
+from app.repository.s3.boto3_repository import S3Repository
+from app.repository.s3.factory import StorageRepositoryFactory
 
 LOGGER = logging.getLogger(__name__)
 
@@ -46,7 +48,7 @@ def create_app(
         try:
             if enable_model_startup:
                 resolved_s3_settings = s3_settings or S3Settings()
-                s3_repository = RepositoryFactory.create_s3(resolved_s3_settings)
+                s3_repository = create_storage_repository(resolved_s3_settings)
                 await s3_repository.download_prefix(
                     resolved_model_settings.bucket,
                     resolved_model_settings.key_prefix,
@@ -139,6 +141,14 @@ def create_app(
         return JSONResponse(content=response.model_dump())
 
     return application
+
+
+def create_storage_repository(settings: S3Settings) -> StorageRepositoryBase:
+    """Register storage providers and construct the configured implementation."""
+
+    factory = StorageRepositoryFactory()
+    factory.register(StorageProvider.RUSTFS, S3Repository)
+    return factory.create(settings.provider, settings)
 
 
 app = create_app()

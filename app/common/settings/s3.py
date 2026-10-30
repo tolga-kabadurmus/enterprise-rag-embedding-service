@@ -1,9 +1,16 @@
 """Validated RustFS/S3 settings for model artifact synchronization."""
 
+from enum import Enum
 from typing import Literal
 
 from pydantic import AnyHttpUrl, Field, SecretStr
 from pydantic_settings import BaseSettings, SettingsConfigDict
+
+
+class StorageProvider(str, Enum):
+    """Supported storage repository provider keys."""
+
+    RUSTFS = "rustfs"
 
 
 class S3Settings(BaseSettings):
@@ -16,7 +23,7 @@ class S3Settings(BaseSettings):
         frozen=True,
     )
 
-    provider: Literal["rustfs"] = "rustfs"
+    provider: StorageProvider = StorageProvider.RUSTFS
     endpoint_url: AnyHttpUrl
     access_key: str = Field(min_length=1)
     secret_key: SecretStr

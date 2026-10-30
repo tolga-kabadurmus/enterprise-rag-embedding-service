@@ -14,13 +14,13 @@ from botocore.config import Config
 
 from app.common.settings.s3 import S3Settings
 from app.repository.models import S3ObjectMetadata
-from app.repository.s3.base import S3Repository
+from app.repository.s3.base import StorageRepositoryBase
 
 LOGGER = logging.getLogger(__name__)
 ResultT = TypeVar("ResultT")
 
 
-class Boto3S3Repository(S3Repository):
+class S3Repository(StorageRepositoryBase):
     """Expose bounded asynchronous model-artifact operations over boto3.
 
     Boto3 remains blocking, so every operation crosses a bounded
