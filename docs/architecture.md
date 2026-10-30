@@ -22,3 +22,7 @@ flowchart LR
 
 The runtime is process-local. Multiple Granian workers create one model runtime
 per worker, so worker count must account for model memory.
+
+`UnhandledExceptionMiddleware` logs inference failures without returning their
+details. Invalid inference input returns `422`, inference timeouts return `504`,
+and unexpected runtime failures return a sanitized `503` instead of HTTP 500.

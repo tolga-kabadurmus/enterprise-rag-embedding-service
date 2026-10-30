@@ -38,6 +38,10 @@ Startup fails if S3 synchronization, tokenizer loading, or ONNX model loading
 fails. Readiness is unavailable until all startup work completes. Shutdown
 closes the ONNX runtime and S3 client.
 
+Inference failures are sanitized: invalid input returns `422`, runtime
+unavailability returns `503`, and inference timeout returns `504`. Internal
+exceptions, model inputs, paths, and stack traces are not returned to clients.
+
 ## Local checks
 
 From the orchestration repository:

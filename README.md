@@ -205,7 +205,7 @@ enterprise-rag-embedding-service/
 
 FastAPI will be served by Granian. The image entrypoint will use `dumb-init` for signal forwarding and cleanup. Provider-specific model storage and inference implementations will remain behind repository contracts and will be constructed in the application composition layer.
 
-`UnhandledExceptionMiddleware` will log unexpected errors with their causes and return a stable, sanitized error response. It must not expose stack traces, local paths, credentials, full input texts, or vectors to API clients.
+`UnhandledExceptionMiddleware` logs unexpected errors with their causes and returns sanitized `422`, `503`, or `504` responses according to the failure category. It does not expose stack traces, local paths, credentials, full input texts, or vectors to API clients.
 
 ## Planned configuration
 

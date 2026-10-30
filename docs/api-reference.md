@@ -10,6 +10,8 @@
 
 ::: app.common.settings.s3
 
+::: app.middleware.exceptions
+
 ::: app.repository.s3.base
 
 ::: app.repository.s3.factory

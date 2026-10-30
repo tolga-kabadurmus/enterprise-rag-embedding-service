@@ -2,12 +2,15 @@
 
 import unittest
 
+import httpx
+from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
 from app.api.models import EmbeddingRequest
 from app.common.settings import ApiSettings, ModelSettings
 from app.main import create_app
+from app.middleware.exceptions import UnhandledExceptionMiddleware
 
 
 class EmbeddingRequestTests(unittest.TestCase):
@@ -94,6 +97,39 @@ class FastApiScaffoldTests(unittest.TestCase):
         )
         self.assertEqual(response.status_code, 422)
         self.assertNotIn("/home/", response.text)
+
+
+class ExceptionMiddlewareTests(unittest.IsolatedAsyncioTestCase):
+    """Verify inference failures use sanitized non-500 status codes."""
+
+    async def _request_for(self, error: Exception) -> httpx.Response:
+        application = FastAPI()
+        application.add_middleware(UnhandledExceptionMiddleware)
+
+        @application.get("/failure")
+        async def failure() -> None:
+            raise error
+
+        async with httpx.AsyncClient(
+            transport=httpx.ASGITransport(
+                app=application,
+                raise_app_exceptions=False,
+            ),
+            base_url="http://test",
+        ) as client:
+            return await client.get("/failure")
+
+    async def test_maps_inference_timeout(self) -> None:
+        response = await self._request_for(TimeoutError("private timeout"))
+
+        self.assertEqual(response.status_code, 504)
+        self.assertNotIn("private timeout", response.text)
+
+    async def test_maps_inference_failure_without_http_500(self) -> None:
+        response = await self._request_for(RuntimeError("private runtime detail"))
+
+        self.assertEqual(response.status_code, 503)
+        self.assertNotIn("private runtime detail", response.text)
 
 
 if __name__ == "__main__":
