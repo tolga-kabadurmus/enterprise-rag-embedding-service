@@ -9,6 +9,7 @@ theme:
 nav:
   - Overview: index.md
   - Architecture and lifecycle: architecture.md
+  - OpenAPI and Swagger UI: openapi.md
   - API reference: api-reference.md
 
 plugins:

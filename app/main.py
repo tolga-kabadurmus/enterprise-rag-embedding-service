@@ -7,7 +7,12 @@ from typing import AsyncIterator
 from fastapi import FastAPI, Request, status
 from fastapi.responses import JSONResponse
 
-from app.api.models import EmbeddingRequest, EmbeddingResponse
+from app.api.models import (
+    EmbeddingRequest,
+    EmbeddingResponse,
+    ErrorResponse,
+    HealthResponse,
+)
 from app.common.settings import ApiSettings, ModelSettings, S3Settings, StorageProvider
 from app.common.utility.logging import configure_logging
 from app.middleware.exceptions import UnhandledExceptionMiddleware
@@ -19,6 +24,20 @@ from app.repository.s3.boto3_repository import S3Repository
 from app.repository.s3.factory import StorageRepositoryFactory
 
 LOGGER = logging.getLogger(__name__)
+
+OPENAPI_TAGS = [
+    {
+        "name": "health",
+        "description": "Process liveness and embedding-model readiness probes.",
+    },
+    {
+        "name": "embeddings",
+        "description": (
+            "Versioned dense and sparse vectorization for document chunks "
+            "and user questions."
+        ),
+    },
+]
 
 
 def create_app(
@@ -77,17 +96,53 @@ def create_app(
     application = FastAPI(
         title="Enterprise RAG Embedding Service",
         version="0.1.0-scaffold",
+        description=(
+            "Shared vectorization API for Enterprise RAG. The service applies "
+            "model-specific document or query preparation and returns aligned "
+            "dense and sparse vectors. Authentication and authorization are "
+            "outside this project's scope."
+        ),
+        openapi_tags=OPENAPI_TAGS,
+        docs_url="/docs",
+        redoc_url="/redoc",
+        openapi_url="/openapi.json",
         lifespan=lifespan,
     )
     application.add_middleware(UnhandledExceptionMiddleware)
 
-    @application.get("/health/live")
-    async def liveness() -> dict[str, str]:
+    @application.get(
+        "/health/live",
+        response_model=HealthResponse,
+        tags=["health"],
+        summary="Check process liveness",
+        description=(
+            "Returns successfully when the HTTP process can handle requests. "
+            "This probe does not verify that the embedding model is loaded."
+        ),
+        operation_id="get_liveness",
+    )
+    async def liveness() -> HealthResponse:
         """Report that the HTTP process is alive."""
 
-        return {"status": "alive"}
+        return HealthResponse(status="alive")
 
-    @application.get("/health/ready")
+    @application.get(
+        "/health/ready",
+        response_model=HealthResponse,
+        tags=["health"],
+        summary="Check model readiness",
+        description=(
+            "Reports whether startup completed and the process-local embedding "
+            "runtime is ready to perform inference."
+        ),
+        operation_id="get_readiness",
+        responses={
+            status.HTTP_503_SERVICE_UNAVAILABLE: {
+                "model": HealthResponse,
+                "description": "The embedding runtime is not ready.",
+            }
+        },
+    )
     async def readiness(request: Request) -> JSONResponse:
         """Report readiness only after a usable runtime is available."""
 
@@ -103,7 +158,32 @@ def create_app(
             )
         return JSONResponse(content={"status": "ready"})
 
-    @application.post("/v1/embeddings")
+    @application.post(
+        "/v1/embeddings",
+        response_model=EmbeddingResponse,
+        tags=["embeddings"],
+        summary="Create document or query embeddings",
+        description=(
+            "Creates one normalized dense vector and one sparse vector for each "
+            "input. Vector order matches text order. Use `document` for chunks "
+            "being indexed and `query` for user questions."
+        ),
+        operation_id="create_embeddings_v1",
+        responses={
+            status.HTTP_413_REQUEST_ENTITY_TOO_LARGE: {
+                "model": ErrorResponse,
+                "description": "The configured batch or aggregate text limit was exceeded.",
+            },
+            status.HTTP_503_SERVICE_UNAVAILABLE: {
+                "model": ErrorResponse,
+                "description": "The embedding model is not ready.",
+            },
+            status.HTTP_504_GATEWAY_TIMEOUT: {
+                "model": ErrorResponse,
+                "description": "Embedding inference exceeded its time limit.",
+            },
+        },
+    )
     async def embeddings(
         http_request: Request,
         request: EmbeddingRequest,

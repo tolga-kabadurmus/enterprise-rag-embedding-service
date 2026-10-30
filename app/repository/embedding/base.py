@@ -4,7 +4,7 @@ from abc import ABC, abstractmethod
 from collections.abc import Sequence
 import math
 
-from pydantic import BaseModel, ConfigDict, field_validator, model_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
 class SparseEmbeddingVector(BaseModel):
@@ -12,8 +12,12 @@ class SparseEmbeddingVector(BaseModel):
 
     model_config = ConfigDict(frozen=True, extra="forbid")
 
-    indices: tuple[int, ...]
-    values: tuple[float, ...]
+    indices: tuple[int, ...] = Field(
+        description="Sorted, unique, non-negative token identifiers."
+    )
+    values: tuple[float, ...] = Field(
+        description="Positive weights aligned by position with token identifiers."
+    )
 
     @model_validator(mode="after")
     def validate_alignment(self) -> "SparseEmbeddingVector":

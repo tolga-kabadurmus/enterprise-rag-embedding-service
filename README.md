@@ -6,6 +6,8 @@
 
 The service exists to prevent indexing and query applications from implementing model-specific tokenization, prefixes, pooling, normalization, and vector dimensions independently.
 
+Authentication (authn) and authorization (authz) are outside the scope of this project and are not implemented or covered by this service.
+
 ## Responsibilities
 
 The service will:
@@ -119,6 +121,17 @@ The application will expose separate liveness and readiness endpoints. Liveness 
 ## REST contract
 
 The first API version uses `POST /v1/embeddings`.
+
+The running service provides interactive and machine-readable API
+documentation:
+
+- Swagger UI: <http://localhost:8081/docs>
+- ReDoc: <http://localhost:8081/redoc>
+- OpenAPI JSON: <http://localhost:8081/openapi.json>
+
+The generated contract includes request and response examples, field
+descriptions, health endpoints, documented error statuses, and stable operation
+IDs. See [OpenAPI and interactive API documentation](docs/openapi.md).
 
 ```json
 {
