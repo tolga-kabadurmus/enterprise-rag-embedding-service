@@ -2,7 +2,9 @@
 
 from typing import Annotated, Literal
 
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, model_validator
+
+from app.repository.embedding.base import SparseEmbeddingVector
 
 
 TextInput = Annotated[str, Field(min_length=1, max_length=32_000)]
@@ -18,7 +20,7 @@ class EmbeddingRequest(BaseModel):
 
 
 class EmbeddingResponse(BaseModel):
-    """Vector response shape reserved for the model implementation."""
+    """Dense and sparse vectors produced from the same ordered text batch."""
 
     model_config = ConfigDict(extra="forbid", frozen=True)
 
@@ -27,6 +29,18 @@ class EmbeddingResponse(BaseModel):
     dimension: int = Field(ge=1)
     normalized: bool
     embeddings: list[list[float]]
+    sparse_model: str = Field(min_length=1)
+    sparse_embeddings: list[SparseEmbeddingVector]
+
+    @model_validator(mode="after")
+    def validate_vector_batches(self) -> "EmbeddingResponse":
+        """Require one correctly-sized dense and sparse vector per input."""
+
+        if len(self.embeddings) != len(self.sparse_embeddings):
+            raise ValueError("dense and sparse embedding counts must match")
+        if any(len(vector) != self.dimension for vector in self.embeddings):
+            raise ValueError("dense embedding dimension does not match metadata")
+        return self
 
 
 class ErrorResponse(BaseModel):

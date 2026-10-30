@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import asyncio
 from collections.abc import Sequence
+from collections import Counter
 import logging
 from pathlib import Path
 from typing import Any
@@ -11,7 +12,7 @@ from typing import Any
 import numpy as np
 
 from app.common.settings.model import ModelSettings
-from app.repository.embedding.base import EmbeddingRuntime
+from app.repository.embedding.base import EmbeddingRuntime, SparseEmbeddingVector
 
 LOGGER = logging.getLogger(__name__)
 
@@ -82,6 +83,23 @@ class OnnxEmbeddingRuntime(EmbeddingRuntime):
         prepared = [f"{self._prefix(input_type)}{text}" for text in texts]
         return await asyncio.to_thread(self._embed_blocking, prepared)
 
+    async def embed_sparse(
+        self,
+        texts: Sequence[str],
+        input_type: str,
+    ) -> list[SparseEmbeddingVector]:
+        """Create deterministic token-frequency vectors from unprefixed text.
+
+        Qdrant applies corpus-level IDF through the configured sparse-vector
+        modifier, so this runtime supplies only positive term frequencies.
+        """
+
+        if input_type not in {"document", "query"}:
+            raise ValueError("input_type must be document or query")
+        if not texts:
+            raise ValueError("texts must not be empty")
+        return await asyncio.to_thread(self._embed_sparse_blocking, list(texts))
+
     async def close(self) -> None:
         """Release references to native model resources."""
 
@@ -114,6 +132,36 @@ class OnnxEmbeddingRuntime(EmbeddingRuntime):
         norms = np.linalg.norm(values, axis=1, keepdims=True)
         normalized = values / np.clip(norms, 1e-12, None)
         return normalized.astype(np.float32).tolist()
+
+    def _embed_sparse_blocking(
+        self,
+        texts: list[str],
+    ) -> list[SparseEmbeddingVector]:
+        """Count non-padding tokenizer IDs and return sorted sparse vectors."""
+
+        encodings = self._tokenizer.encode_batch(
+            texts,
+            add_special_tokens=False,
+        )
+        vectors: list[SparseEmbeddingVector] = []
+        for encoding in encodings:
+            counts = Counter(
+                token_id
+                for token_id, attended in zip(
+                    encoding.ids,
+                    encoding.attention_mask,
+                    strict=True,
+                )
+                if attended
+            )
+            indices = tuple(sorted(counts))
+            vectors.append(
+                SparseEmbeddingVector(
+                    indices=indices,
+                    values=tuple(float(counts[index]) for index in indices),
+                )
+            )
+        return vectors
 
     @staticmethod
     def _load_blocking(model_path: Path, tokenizer_path: Path) -> tuple[Any, Any]:

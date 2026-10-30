@@ -2,7 +2,7 @@
 
 from collections.abc import Sequence
 
-from app.repository.embedding.base import EmbeddingRuntime
+from app.repository.embedding.base import EmbeddingRuntime, SparseEmbeddingVector
 
 
 class ScaffoldEmbeddingRuntime(EmbeddingRuntime):
@@ -25,6 +25,15 @@ class ScaffoldEmbeddingRuntime(EmbeddingRuntime):
         input_type: str,
     ) -> list[list[float]]:
         """Reject inference rather than returning fabricated vectors."""
+
+        raise RuntimeError("embedding model runtime is not implemented")
+
+    async def embed_sparse(
+        self,
+        texts: Sequence[str],
+        input_type: str,
+    ) -> list[SparseEmbeddingVector]:
+        """Reject sparse inference rather than fabricating lexical vectors."""
 
         raise RuntimeError("embedding model runtime is not implemented")
 

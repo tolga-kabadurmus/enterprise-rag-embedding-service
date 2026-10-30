@@ -36,6 +36,10 @@ class ModelSettings(BaseSettings):
     onnx_model_file: Path = Path("onnx/model.onnx")
     tokenizer_file: Path = Path("tokenizer.json")
     dimension: int = Field(default=384, ge=1)
+    sparse_model_name: str = Field(
+        default="multilingual-e5-token-frequency-v1",
+        min_length=1,
+    )
 
     @field_validator("bucket", "key_prefix")
     @classmethod

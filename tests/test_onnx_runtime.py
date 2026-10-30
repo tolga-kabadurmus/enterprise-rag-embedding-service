@@ -23,11 +23,19 @@ class FakeTokenizer:
 
     def __init__(self) -> None:
         self.texts: list[str] = []
+        self.add_special_tokens: bool | None = None
 
-    def encode_batch(self, texts: list[str]) -> list[FakeEncoding]:
+    def encode_batch(
+        self,
+        texts: list[str],
+        add_special_tokens: bool = True,
+    ) -> list[FakeEncoding]:
         self.texts = texts
+        self.add_special_tokens = add_special_tokens
+        if add_special_tokens:
+            return [FakeEncoding([1, 2], [1, 1], [0, 0]) for _ in texts]
         return [
-            FakeEncoding([1, 2], [1, 1], [0, 0])
+            FakeEncoding([1, 2, 2, 0], [1, 1, 1, 0], [0, 0, 0, 0])
             for _ in texts
         ]
 
@@ -97,6 +105,21 @@ class OnnxRuntimeTests(unittest.IsolatedAsyncioTestCase):
         await runtime.embed(["question"], "query")
 
         self.assertEqual(tokenizer.texts, ["query: question"])
+
+    async def test_sparse_vectors_use_unprefixed_token_frequencies(self) -> None:
+        tokenizer = FakeTokenizer()
+        runtime = OnnxEmbeddingRuntime(
+            FakeSession(),
+            tokenizer,
+            ModelSettings(),
+        )
+
+        vectors = await runtime.embed_sparse(["question question"], "query")
+
+        self.assertEqual(tokenizer.texts, ["question question"])
+        self.assertFalse(tokenizer.add_special_tokens)
+        self.assertEqual(vectors[0].indices, (1, 2))
+        self.assertEqual(vectors[0].values, (1.0, 2.0))
 
 
 if __name__ == "__main__":

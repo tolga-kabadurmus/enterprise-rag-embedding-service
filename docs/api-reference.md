@@ -19,3 +19,5 @@
 ::: app.repository.s3.boto3_repository
 
 ::: app.repository.embedding.onnx_runtime
+
+::: app.repository.embedding.base

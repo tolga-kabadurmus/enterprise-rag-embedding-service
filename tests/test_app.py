@@ -7,10 +7,11 @@ from fastapi import FastAPI
 from fastapi.testclient import TestClient
 from pydantic import ValidationError
 
-from app.api.models import EmbeddingRequest
+from app.api.models import EmbeddingRequest, EmbeddingResponse
 from app.common.settings import ApiSettings, ModelSettings
 from app.main import create_app
 from app.middleware.exceptions import UnhandledExceptionMiddleware
+from app.repository.embedding.base import SparseEmbeddingVector
 
 
 class EmbeddingRequestTests(unittest.TestCase):
@@ -42,6 +43,22 @@ class EmbeddingRequestTests(unittest.TestCase):
                 unexpected="value",
             )
 
+    def test_response_keeps_dense_and_sparse_batches_aligned(self) -> None:
+        response = EmbeddingResponse(
+            model="intfloat/multilingual-e5-small",
+            revision="main",
+            dimension=2,
+            normalized=True,
+            embeddings=[[0.6, 0.8]],
+            sparse_model="multilingual-e5-token-frequency-v1",
+            sparse_embeddings=[
+                SparseEmbeddingVector(indices=(7,), values=(1.0,))
+            ],
+        )
+
+        self.assertEqual(response.embeddings[0], [0.6, 0.8])
+        self.assertEqual(response.sparse_embeddings[0].indices, (7,))
+
 
 class SettingsTests(unittest.TestCase):
     """Validate defaults and model-directory safety."""
@@ -61,6 +78,10 @@ class SettingsTests(unittest.TestCase):
             "/models/embedding/intfloat/multilingual-e5-small",
         )
         self.assertEqual(ApiSettings().port, 8081)
+        self.assertEqual(
+            ModelSettings().sparse_model_name,
+            "multilingual-e5-token-frequency-v1",
+        )
 
 
 class FastApiScaffoldTests(unittest.TestCase):

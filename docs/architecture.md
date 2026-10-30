@@ -14,11 +14,19 @@ Cross-repository extraction is intentionally deferred.
 flowchart LR
     RustFS[(RustFS models bucket)] -->|paginated prefix download| S3[Embedding S3 repository]
     S3 -->|all model files| Local[/models/embedding/intfloat/multilingual-e5-small]
-    Local --> Runtime[ONNX + tokenizer runtime]
-    Runtime --> API[FastAPI /v1/embeddings]
-    API --> Indexing[enterprise-rag-indexing]
-    API --> Query[enterprise-rag-query]
+    Local --> Runtime[ONNX + shared tokenizer runtime]
+    Runtime --> Dense[Normalized E5 dense vectors]
+    Runtime --> Sparse[Token-frequency sparse vectors]
+    Dense --> API[FastAPI /v1/embeddings]
+    Sparse --> API
+    API -->|dense + sparse batches| Indexing[enterprise-rag-indexing]
+    API -->|dense + sparse batches| Query[enterprise-rag-query]
 ```
+
+Dense preparation applies the E5 `passage:` or `query:` prefix. Sparse
+preparation deliberately encodes raw text without those prefixes, counts
+non-padding token IDs, and returns sorted indices with positive frequencies.
+The API validates that dense and sparse batches remain one-to-one.
 
 The runtime is process-local. Multiple Granian workers create one model runtime
 per worker, so worker count must account for model memory.

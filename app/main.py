@@ -131,12 +131,18 @@ def create_app(
                 content={"detail": "embedding model is not ready"},
             )
         vectors = await runtime.embed(request.texts, request.input_type)
+        sparse_vectors = await runtime.embed_sparse(
+            request.texts,
+            request.input_type,
+        )
         response = EmbeddingResponse(
             model=resolved_model_settings.model_name,
             revision=resolved_model_settings.revision,
             dimension=resolved_model_settings.dimension,
             normalized=True,
             embeddings=vectors,
+            sparse_model=resolved_model_settings.sparse_model_name,
+            sparse_embeddings=sparse_vectors,
         )
         return JSONResponse(content=response.model_dump())
 

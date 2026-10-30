@@ -2,7 +2,7 @@
 
 This service synchronizes the configured embedding model from RustFS during
 FastAPI lifespan startup, loads one ONNX runtime per process, and exposes
-`POST /v1/embeddings` for document and query vectors.
+`POST /v1/embeddings` for aligned dense and sparse document/query vectors.
 
 The local development model location is:
 
@@ -13,7 +13,9 @@ s3://models/embeddings/intfloat/multilingual-e5-small/
 
 The service applies `passage: ` to document chunks and `query: ` to user
 questions before tokenization. It performs attention-mask-aware mean pooling
-and L2 normalization. It does not discover documents, chunk PDFs, persist
+and L2 normalization for dense output. The same pinned tokenizer encodes raw
+text into sorted token-frequency sparse vectors; Qdrant applies IDF when those
+vectors are persisted. It does not discover documents, chunk PDFs, persist
 Qdrant points, retrieve context, or call an LLM.
 
 The S3 settings are supplied through the root environment file
@@ -30,6 +32,7 @@ S3_MAX_CONCURRENCY
 EMBEDDINGS_BUCKET=models
 EMBEDDINGS_KEY_PREFIX=embeddings/intfloat/multilingual-e5-small
 EMBEDDINGS_LOCAL_DIRECTORY=/models/embedding/intfloat/multilingual-e5-small
+EMBEDDINGS_SPARSE_MODEL_NAME=multilingual-e5-token-frequency-v1
 ```
 
 ## Lifecycle
@@ -52,4 +55,5 @@ docker compose --profile dev up -d enterprise-rag-embedding-service
 curl http://localhost:8081/health/ready
 ```
 
-The indexer and query consumers do not yet call this service automatically.
+The indexing consumer calls this service and persists both representations.
+The query consumer currently uses only the dense representation.
