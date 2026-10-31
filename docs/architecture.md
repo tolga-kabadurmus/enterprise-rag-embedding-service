@@ -20,7 +20,7 @@ flowchart LR
     Dense --> API[FastAPI /v1/embeddings]
     Sparse --> API
     API -->|dense + sparse batches| Indexing[enterprise-rag-indexing]
-    API -->|dense + sparse batches| Query[enterprise-rag-query]
+    API -->|dense + sparse batches| Query[enterprise-rag-retrieval]
 ```
 
 Dense preparation applies the E5 `passage:` or `query:` prefix. Sparse

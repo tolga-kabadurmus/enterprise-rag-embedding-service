@@ -13,7 +13,7 @@ Authentication (authn) and authorization (authz) are outside the scope of this p
 The service will:
 
 - Accept batches of document chunks from `enterprise-rag-indexing`.
-- Accept user questions from `enterprise-rag-query`.
+- Accept user questions from `enterprise-rag-retrieval`.
 - Apply the correct model-specific input preparation. For `intfloat/multilingual-e5-small`, document chunks use `passage:` and questions use `query:`.
 - Tokenize inputs, run bounded inference, pool token embeddings, and normalize output vectors consistently.
 - Return aligned dense and token-frequency sparse vectors together with dense/sparse model identity, pinned revision, dimension, and normalization metadata.
@@ -39,7 +39,7 @@ flowchart TB
     subgraph Runtime[Enterprise RAG runtime]
         Indexing[enterprise-rag-indexing<br/>Disposable async Job]
         Embedding[enterprise-rag-embedding-service<br/>FastAPI + Granian]
-        Query[enterprise-rag-query<br/>RAG API]
+        Query[enterprise-rag-retrieval<br/>RAG API]
     end
 
     RustFS[(RustFS)]
@@ -81,7 +81,7 @@ sequenceDiagram
 ```mermaid
 sequenceDiagram
     actor User
-    participant Q as enterprise-rag-query
+    participant Q as enterprise-rag-retrieval
     participant E as enterprise-rag-embedding-service
     participant V as Qdrant
     participant L as LLM provider
@@ -234,18 +234,34 @@ FastAPI will be served by Granian. The image entrypoint will use `dumb-init` for
 
 ## Configuration
 
-The root orchestration repository owns the service's local environment files:
+The orchestration repository commits the safe template `dev-envs/enterprise-rag-embedding-service.env.example`. Copy it to the Git-ignored `dev-envs/enterprise-rag-embedding-service.env`; Compose injects that file only into this service. The implementation validates three independent Pydantic `BaseSettings` groups.
 
-- Safe template committed to Git: `dev-envs/enterprise-rag-embedding-service.env.example`
-- Real Git-ignored configuration: `dev-envs/enterprise-rag-embedding-service.env`
+| Variable | Default/example | Purpose |
+| --- | --- | --- |
+| `EMBEDDING_SERVICE_HOST` | `0.0.0.0` | Granian bind address |
+| `EMBEDDING_SERVICE_PORT` | `8081` | Internal API port |
+| `EMBEDDING_SERVICE_LOG_LEVEL` | `INFO` | `DEBUG`, `INFO`, `WARNING`, or `ERROR` logging |
+| `EMBEDDING_SERVICE_MAX_BATCH_SIZE` | `32` | Maximum inputs accepted per request |
+| `EMBEDDING_SERVICE_MAX_TEXT_CHARACTERS` | `32000` | Maximum aggregate input characters per request |
+| `S3_PROVIDER` | `rustfs` | Provider selected by `StorageRepositoryFactory` |
+| `S3_ENDPOINT_URL` | `http://rustfs:9000` | Required S3-compatible model-storage endpoint |
+| `S3_ACCESS_KEY` | required | RustFS/S3 access key |
+| `S3_SECRET_KEY` | required | RustFS/S3 secret key, held as `SecretStr` |
+| `S3_REGION` | `us-east-1` | S3 signing region |
+| `S3_ADDRESSING_STYLE` | `path` | `path`, `virtual`, or `auto` addressing |
+| `S3_VERIFY_TLS` | `false` locally | TLS certificate verification |
+| `S3_MAX_CONCURRENCY` | `4` | Bounded concurrent model-artifact downloads |
+| `EMBEDDINGS_MODEL_NAME` | `intfloat/multilingual-e5-small` | Model identity returned by the API |
+| `EMBEDDINGS_REVISION` | `main` | Model revision identity |
+| `EMBEDDINGS_LOCAL_DIRECTORY` | `/models/embedding/intfloat/multilingual-e5-small` | Absolute synchronized model directory |
+| `EMBEDDINGS_BUCKET` | `models` | Model-artifact bucket |
+| `EMBEDDINGS_KEY_PREFIX` | `embeddings/intfloat/multilingual-e5-small` | Model-artifact key prefix |
+| `EMBEDDINGS_DIMENSION` | `384` | Dense vector dimension |
+| `EMBEDDINGS_SPARSE_MODEL_NAME` | `multilingual-e5-token-frequency-v1` | Sparse encoder identity |
+| `EMBEDDINGS_ONNX_MODEL_FILE` | `onnx/model.onnx` | Safe path relative to the local model directory |
+| `EMBEDDINGS_TOKENIZER_FILE` | `tokenizer.json` | Safe path relative to the local model directory |
 
-The Compose service will use the real file through `env_file`. Configuration names will be finalized with their Pydantic `BaseSettings` classes. Expected groups include:
-
-- API host, port, log level, worker count, and request limits.
-- Model name, pinned revision, local directory, runtime, maximum token length, and inference concurrency.
-- S3-compatible endpoint, credentials, region, addressing style, TLS verification, model bucket, and model key prefix used to synchronize artifacts from RustFS.
-
-Credentials use secret-aware settings types and are never written to logs. The current development model location is `s3://models/embeddings/intfloat/multilingual-e5-small/`, synchronized to `/models/embedding/intfloat/multilingual-e5-small`.
+The model identity, revision, dimension, normalization contract, and sparse model name must match the expectations configured in indexing and retrieval. Credentials are never written to logs. The development model location is `s3://models/embeddings/intfloat/multilingual-e5-small/`, synchronized to `/models/embedding/intfloat/multilingual-e5-small`.
 
 ## Docker and deployment behavior
 
@@ -283,6 +299,8 @@ Model storage and real-runtime checks will remain separate integration tests. En
 Once Python implementation code exists, this repository must include MkDocs with generated API references and pass `mkdocs build --strict`. Root Compose configuration must also pass `docker compose --profile dev config` after the service is introduced.
 
 ## Current limitations
+
+no authenticationno authorization procesed have been covered at the project
 
 - Health endpoints and `/v1/embeddings` are implemented for local development.
 - Model artifacts are downloaded from the configured RustFS prefix during startup.
