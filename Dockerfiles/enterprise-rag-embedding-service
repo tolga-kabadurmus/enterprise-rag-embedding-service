@@ -1,0 +1,25 @@
+FROM enterprise_rag_base
+
+USER root
+
+# FastAPI and Granian are service-specific. Shared Python dependencies are
+# installed by the enterprise_rag_base image and are intentionally not
+# repeated here.
+COPY requirements.txt ./
+RUN python -m pip install --no-cache-dir --requirement requirements.txt
+# The tokenizer wheel is installed without dependencies so the shared base
+# image's pinned huggingface_hub package is not replaced by tokenizers' older
+# dependency range.
+RUN python -m pip install --no-cache-dir --no-deps tokenizers==0.21.4
+
+COPY ./app ./app
+
+RUN mkdir -p /models/embedding/intfloat/multilingual-e5-small \
+    && chown -R appuser:appuser /models
+
+USER appuser
+WORKDIR /app
+
+ENTRYPOINT ["/usr/bin/dumb-init", "--"]
+
+CMD ["granian", "--interface", "asgi", "--host", "0.0.0.0", "--port", "8081", "app.main:app"]
